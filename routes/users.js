@@ -17,7 +17,7 @@ router.get('/:userId', user_controller.user_detail);
 // PUT update user details
 router.put('/:userId', user_controller.user_update);
 // POST update user profile picture
-router.post('/:userId', user_controller.profile_pic_update);
+router.post('/:userId/profilepic', user_controller.profile_pic_update);
 // DELETE a user
 router.delete('/:userId', user_controller.user_delete);
 
