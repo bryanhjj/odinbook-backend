@@ -267,7 +267,6 @@ exports.profile_pic_update = [
 ];
 
 // Delete a user profile
-// how will we deal with the friend related things when a user deletes his/her profile?
 exports.user_delete = function (req, res, next) {
     // console.log(req.params.userId, req.payload.id); // for troubleshooting
     if (req.params.userId !== req.payload.id) {
