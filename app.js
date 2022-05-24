@@ -12,7 +12,7 @@ var indexRouter = require('./routes/index');
 var app = express();
 app.use(cookieParser());
 app.use(cors({
-    origin: 'https://bryanhjj.github.io',
+    origin: '*',
     optionsSuccessStatus: 200,
 }));
 app.use(logger('dev'));
