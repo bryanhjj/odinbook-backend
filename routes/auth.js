@@ -1,8 +1,8 @@
 var express = require("express");
 var router = express.Router();
-const facebookTokenStrategy = require("../../strategies/facebookToken");
+const facebookTokenStrategy = require("../strategies/facebookToken");
 const { check, body, validationResult } = require("express-validator");
-var User = require("../../models/user");
+var User = require("../models/user");
 const passport = require("passport");
 passport.use(facebookTokenStrategy);
 const { issueJWT, validatePassword } = require('../utils/bcrypt');
@@ -33,8 +33,9 @@ router.post('/register', user_controller.user_create);
 // POST login
 router.post("/login",
 
-  body("username", "Username required").trim().isEmail().escape(),
-  body("password", "Password required").trim().isLength({ min: 1 }).escape(),
+  // Validate user input before sending the POST login req
+  body('username', 'Username required').trim().isLength({ min: 1 }).escape(),
+  body('password', 'Password required').trim().isLength({ min: 1 }).escape(),
 
   async (req, res, next) => {
     const { username, password } = req.body;
@@ -44,9 +45,10 @@ router.post("/login",
     }
 
     try {
-      const foundUser = await User.findOne({ username }).select("+password");
+      const foundUser = await User.findOne({username}).select("+password");
       if (foundUser) {
-        const passwordMatch = validatePassword(password, foundUser);
+        // returns as <Pending> if we don't await here
+        const passwordMatch = await validatePassword(password, foundUser);
         if (passwordMatch) {
           const tokenObj = issueJWT(foundUser);
 
@@ -73,3 +75,5 @@ router.post("/login",
     }
   }
 );
+
+module.exports = router;
