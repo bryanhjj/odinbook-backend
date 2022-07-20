@@ -2,11 +2,25 @@ var express = require('express');
 var router = express.Router();
 const postController = require('../controllers/postController');
 const passport = require('passport');
+const commentController = require('../controllers/commentController');
 var getToken = require('../utils/getToken');
 
 router.use(passport.authenticate(['jwt', 'facebook-token'], {session: false}));
 router.use(getToken);
 
+// Comments related stuff
+// PUT toggle like/dislike
+router.put('/:postId/comments/:commentId/like', commentController.comment_like);
+// GET a specific comment
+router.get('/:postId/comments/:commentId',commentController.comment_get);
+// POST edit a comment
+router.post('/:postId/comments/:commentId', commentController.comment_edit);
+// DELETE a comment
+router.delete('/:postId/comments/:commentId', commentController.comment_delete);
+// POST new comment
+router.post('/:postId/comments/', commentController.comment_create);
+
+// Posts related stuff
 // PUT toggle like/dislike
 router.put('/:postId/like', postController.post_like);
 // GET specific post
