@@ -1,3 +1,5 @@
+// THIS WHOLE FILE IS NOW REDUNDANT, REPLACED BY POST ROUTER IN /routes/posts.js
+/*
 var express = require('express');
 var router = express.Router();
 const commentController = require('../controllers/commentController');
@@ -17,3 +19,4 @@ router.delete('/:commentId', commentController.comment_delete);
 router.post('/', commentController.comment_create);
 
 module.exports = router;
+*/
