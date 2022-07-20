@@ -81,7 +81,7 @@ exports.user_create = [
         });
         if (!errors.isEmpty()) {
             // There are errors.
-            return res.status(400).json({error: errors.array()});
+            return res.status(400).json({errors: errors.array()});
         } else {
             // User input is valid.
             // Check if username already exists.
@@ -105,13 +105,13 @@ exports.user_create = [
                     // if user have submitted a profil pic while signing up/registering
                     // to double check
                     if (req.hasOwnProperty('file')) {
-                        newUser.profile_pic = `${process.env.BASE_URL}/public/images/` + req.file.filename;
+                        newUser.profile_pic = `${process.env.BASE_URI}/public/images/` + req.file.filename;
                     }
                     newUser.save(function(err) {
                         if (err) {
                             return next(err);
                         }
-                        // Success, redirect user to the home page.
+                        // Success
                         const tokenObj = issueJWT(newUser);
                         return res.status(201).json({
                             message: 'Registration successful',
@@ -138,7 +138,7 @@ exports.user_detail = function(req, res, next) {
     async.parallel({
         user: function(callback) {
             User
-            .findById(req.params.id)
+            .findById(req.params.userId)
             .populate('friend_list')
             .populate('friend_req_sent')
             .populate('friend_req_rec')
@@ -146,7 +146,7 @@ exports.user_detail = function(req, res, next) {
         },
         posts: function(callback) {
             Post
-            .find({'post_author': req.params.id})
+            .find({'post_author': req.params.userId})
             .populate('post_author')
             .exec(callback);
         },
@@ -167,15 +167,17 @@ exports.user_detail = function(req, res, next) {
 exports.user_update = [
 
     // Validate the users' input for updating their profile.
+    /*
     check("password").exists(),
     check("confirmPassword", "Password and confirmed password must match")
       .exists()
       .custom((value, { req }) => value === req.body.password),
+    */
     body('first_name', 'First name required').trim().isLength({ min: 1 }).escape(),
     body('last_name', 'Last name required').trim().isLength({ min: 1 }).escape(),
 
     // Proceed with the update request.
-    (req, res, next) => {
+    async (req, res, next) => {
 
         // Extract the validation errors from a request.
         const errors = validationResult(req);
@@ -184,30 +186,22 @@ exports.user_update = [
             // There are errors.
             return res.status(500).json({message: errors});
         } else {
-            async.parallel({
-                user: function(callback) {
-                    User.findById(req.payload.id).exec(callback);
-                },
-            }, function(err, results) {
-                if (err) {
-                    return res.status(500).json({message: err});
-                }
-                if (results.user == null) {
-                    return res.status(404).json({message: 'User not found'});
-                }
-                results.user.first_name = req.body.first_name;
-                results.user.last_name = req.body.last_name;
-                results.user.phone_number = req.body.phone_number;
-                results.user.email = req.body.email;
-
-                const updatedUser = results.user.save();
-                const tokenObj = issueJWT(updatedUser)
+            try {
+                const targetUser = await User.findById(req.payload.id);
+                targetUser.first_name = req.body.first_name;
+                targetUser.last_name = req.body.last_name;
+                targetUser.phone_number = req.body.phone_number;
+                targetUser.email = req.body.email
+                const updatedUser = await targetUser.save();
+                const tokenObj = issueJWT(updatedUser);
                 return res.status(201).json({
                     message: 'Update successful',
                     token: tokenObj,
                     user: updatedUser
                 });
-            });
+            } catch (err) {
+                return res.status(500).json({message: err});
+            }
         }
     }
 ];
@@ -255,7 +249,7 @@ exports.profile_pic_update = [
                     return res.status(404).json({message: 'User not found.'});
                 }
                 results.user.profile_pic = req.file ? 
-                    `${process.env.BASE_URL}/public/images/` + req.file.filename : null;
+                    `${process.env.BASE_URI}/public/images/` + req.file.filename : null;
                 const updatedUser = results.user.save();
                 return res.status(201).json({
                     message: "Profile picture successfully updated",
@@ -268,21 +262,20 @@ exports.profile_pic_update = [
 
 // Delete a user profile
 exports.user_delete = function (req, res, next) {
-    // console.log(req.params.userId, req.payload.id); // for troubleshooting
     if (req.params.userId !== req.payload.id) {
         return res.status(401).json({message: 'You can only delete your own account!'});
     }
     async.parallel({
         user: function(callback) {
-            User.findById(req.body.userid).exec(callback);
+            User.findById(req.params.userId).exec(callback);
         },
         posts: function(callback) {
-            Post.find({'post_author': req.body.userid}).exec(callback);
+            Post.find({'post_author': req.params.userId}).exec(callback);
         },
         comments: function(callback) {
-            Comment.find({'comment_author': req.body.userid}).exec(callback);
+            Comment.find({'comment_author': req.params.userId}).exec(callback);
         },
-    }, function(err, results) {
+    }, async function (err, results) {
         if (err) {
             return res.status(500).json({message: err});
         }
@@ -304,7 +297,7 @@ exports.user_delete = function (req, res, next) {
                 });
             }
         }
-        User.findByIdAndRemove(req.body.userid, function deleteUser(err){
+        User.findByIdAndRemove(req.params.userId, function deleteUser(err){
             if (err) {
                 return res.status(500).json({message: err});
             }
@@ -318,48 +311,44 @@ exports.user_delete = function (req, res, next) {
             u.friend_list = updatedFriends;
             u.friend_req_rec = updatedFriendReq;
             u.friend_req_sent = updatedFriendSent;
-            await u.save;
+            const updatedU = await u.save;
         }
         return res.status(200).json({message: 'User deleted'});
     });
 };
 
 // (POST) send a friend request to a user
-exports.user_FLreq = function(req, res, next){
+exports.user_FLreq = async function(req, res, next){
     const {target_userId} = req.body;
-    async.parallel({
-        user: function(callback) {
-            User.findById(target_userId).exec(callback);
-        },
-    }, function(err, results) {
-        if (err) {
-            return res.status(500).json({message: err});
-        }
-        if (results.user == null) {
-            var err = new Error('User not found');
-            err.status = 404;
-            return res.status(500).json({message: err});
-        }
-        if (results.user._id == req.payload.id) {
+    try {
+        const targetUser = await User.findById(target_userId);
+        const curUser = await User.findById(req.payload.id);
+        // if it's the same user trying to befriend him/herself
+        if(targetUser._id === req.payload.id) {
             return res.status(400).json({ message: 'You cannot befriend yourself! You pepega.' });
         }
-        if (results.user.friend_list.includes(req.payload.id)) {
+        // target user is already friends with you
+        if (targetUser.friend_list.includes(req.payload.id)) {
             return res.status(400).json({ message: 'You are already friends with this user!' });
         }
-        if (results.user.friend_req_rec.includes(req.payload.id)) {
+        // you've already sent a friend request to the target user
+        if (targetUser.friend_req_rec.includes(req.payload.id)) {
             return res.status(400).json({ message: 'You have already sent a friend request to this user!' });
         }
-        // If everything goes well
-        // pushes the currently logged user's id into the target user's friend_req_rec
-        const updatedFriendReq = [...results.user.friend_req_rec, req.payload.id];
-        results.user.friend_req_rec = updatedFriendReq;
-        const updatedTargetUser = await results.user.save();
-        return res.status(200).json({ message: 'Friend request sent.', user: updatedTargetUser });
-    });
+        const updatedFriendReqRec = [...targetUser.friend_req_rec, req.payload.id];
+        const updatedFriendReqSent = [...curUser.friend_req_sent, targetUser._id];
+        targetUser.friend_req_rec = updatedFriendReqRec;
+        curUser.friend_req_sent = updatedFriendReqSent;
+        const updatedTargetUser = await targetUser.save();
+        const updatedCurUser = await curUser.save();
+        return res.status(200).json({message: 'Friend request sent.', user: updatedTargetUser, curUser: updatedCurUser});
+    } catch(error) {
+        return res.status(500).json({error: error});
+    }
 };
 
 // (PUT) accepting a friend request
-exports.user_accept = function (req, res, next) {
+exports.user_accept = async function (req, res, next) {
     const {target_userId} = req.body;
 
     const targetUser = await User.findById(target_userId);
@@ -381,10 +370,10 @@ exports.user_accept = function (req, res, next) {
 
     // process for friend request accepted on the target user's end (i.e.: the user who sent the req)
     const updatedTargetFriendSent = targetUser.friend_req_sent.filter((req) => {
-        req != req.payload.id;
+        req != updatedAcceptingUser._id;
     });
     targetUser.friend_req_sent = updatedTargetFriendSent;
-    const updatedTargetFriendList = [...targetUser.friend_list, req.payload.id];
+    const updatedTargetFriendList = [...targetUser.friend_list, updatedAcceptingUser._id];
     targetUser.friend_list = updatedTargetFriendList;
     await targetUser.save();
 
@@ -393,45 +382,36 @@ exports.user_accept = function (req, res, next) {
 };
 
 // (DELETE) denying a friend request
-exports.user_deny = function (req, res, next) {
+exports.user_deny = async function (req, res, next) {
     const {target_userId} = req.body;
-
-    async.parallel({
-        user: function(callback) {
-            User.findById(target_userId).exec(callback);
-        },
-    }, function(err, results) {
-        if (err) {
-            return next(err);
-        }
+    
+    try {
         // if the target user did not sent a friend request
-        if (!results.user.friend_req_sent.includes(req.payload.id)) {
+        const targetUser = await User.findById(target_userId);
+        if (!targetUser.friend_req_sent.includes(req.payload.id)) {
             return res.status(404).json({ message: 'Friend request not found.'});
         }
-        const updatedFriendReq = results.user.friend_req_sent.filter((user) => {
-            user != req.payload.id;
-        });
-        results.user.friend_req_sent = updatedFriendReq;
-        await results.user.save();
-    });
 
-    async.parallel({
-        user: function(callback) {
-            User.findById(req.payload.id).exec(callback);
-        },
-    }, function(err, results) {
-        if (err) {
-            return next(err);
-        }
-        // to check if you've actually received a friend request from the target user
-        if (!results.user.friend_req_rec.includes(target_userId)) {
+        // remove the friend_req_sent from the sender's array
+        const updatedFriendReq = targetUser.friend_req_sent.filter((user) => user != req.payload.id);
+        targetUser.friend_req_sent = updatedFriendReq;
+        const updatedTargetUser = await targetUser.save();
+
+        // remove the friend_req_rec from the user(you)
+        const curUser = await User.findById(req.payload.id);
+        if (!curUser.friend_req_rec.includes(target_userId)) {
             return res.status(404).json({ message: 'Friend request not found.'});
         }
-        const updatedFriendReqRec = results.user.friend_req_rec.filter((user) => {
-            user != target_userId;
+        const updatedFriendRec = curUser.friend_req_rec.filter((user) => user != target_userId);
+        curUser.friend_req_rec = updatedFriendRec;
+        const updatedCurUser = await curUser.save();
+        return res.status(200).json({
+            message: 'Friend request deleted.', 
+            targetUser: updatedTargetUser, 
+            user: updatedCurUser
         });
-        results.user.friend_req_rec = updatedFriendReqRec;
-        const updatedUser = await results.user.save();
-        return res.status(200).json({ message: 'Friend request successfully deleted.', user: updatedUser});
-    });
+
+    } catch(error) {
+        return res.status(500).json({error: error});
+    }
 };
