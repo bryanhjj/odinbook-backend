@@ -1,6 +1,11 @@
 var express = require('express');
 var router = express.Router();
+const passport = require('passport');
 const user_controller = require('../controllers/userController');
+var getToken = require('../utils/getToken');
+
+router.use(passport.authenticate(['jwt', 'facebook-token'], {session: false}));
+router.use(getToken);
 
 // GET all users
 router.get('/', user_controller.user_list);
