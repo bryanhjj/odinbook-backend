@@ -1,5 +1,5 @@
 var mongoose = require('mongoose');
-import { format } from 'date-fns';
+var { format } = require('date-fns');
 
 var Schema = mongoose.Schema;
 
