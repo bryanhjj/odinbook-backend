@@ -6,6 +6,16 @@ var User = require("../models/user");
 var opts = {};
 opts.jwtFromRequest = ExtractJwt.fromAuthHeaderAsBearerToken();
 opts.secretOrKey = process.env.JWT_WORD;
+
+/*
+opts.jsonWebTokenOptions = {
+  complete: false,
+  clockTolerance: '',
+  maxAge: '2d',
+  clockTimestamp: '100',
+  nonce: 'string here for OpenID',
+}
+*/
 // opts.issuer = "accounts.examplesoft.com";
 // opts.audience = "yoursite.net";
 
