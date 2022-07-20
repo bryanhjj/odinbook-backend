@@ -4,6 +4,16 @@ const { body,validationResult } = require("express-validator");
 var async = require('async');
 
 
+// (GET) Get a specific comment
+exports.comment_get = async function(req, res, next) {
+    try {
+        const comment = await Comment.findById(req.params.id).populate('comment_author');
+        res.status(200).json({comment: comment});
+    } catch(err) {
+        return res.status(500).json({message: err});
+    }
+}
+
 // (POST) Create a new comment
 exports.comment_create = [
     // Validate user input
@@ -14,7 +24,7 @@ exports.comment_create = [
         // Extract errors, if any
         const errors = validationResult(req);
         // Create a new Post object with the validated data
-        var newComment = new ({
+        var newComment = new Comment ({
             comment_content: req.body.comment_content,
             comment_timestamp: new Date(),
             comment_author: req.payload.id,
@@ -25,11 +35,11 @@ exports.comment_create = [
             // There are errors
             return res.status(500).json({error: errors});
         } else {
-            await newComment.save(function(err){
+            await newComment.save(async function(err){
                 if (err) {
                     return res.status(500).json({error: err});
                 } else {
-                    const relatedPost = Post.findById(req.params.postId);
+                    const relatedPost = await Post.findById(req.params.postId);
                     relatedPost.post_comments.push(newComment);
                     await relatedPost.save();
                     return res.status(201).json({message: 'Successfully commented', comment: newComment});
@@ -49,13 +59,13 @@ exports.comment_edit = [
         // Extract the validation errors from a request.
         const errors = validationResult(req);
         // Create a new Post object to replace the old one.
-        var newComment = new ({
+        var newComment = new Comment ({
             comment_content: req.body.comment_content,
             comment_timestamp: new Date(),
             comment_author: req.payload.id,
             related_post: req.body.related_post,
             comment_likes: req.body.comment_likes,
-            _id: req.params.id, // required if we're updating via POST method
+            _id: req.params.commentId, // required if we're updating via POST method
         });
         if (!errors.isEmpty()) {
             // There are errros
@@ -67,12 +77,12 @@ exports.comment_edit = [
         }
         else {
             // No problems, finalizing the edit/update
-            Comment.findByIdAndUpdate(req.params.commentId, newComment, {}, function(err, updatedComment){
+            Comment.findByIdAndUpdate(req.params.commentId, newComment, {}, function(err, oldComment){
                 if (err) {
-                    return res.status(500).json({error: err});
+                    return next(err);
                 } else {
                     // Edit/update success
-                    res.status(201).json({message: 'Comment successfully updated.', comment: updatedComment});
+                    res.status(201).json({message: 'Comment successfully updated.', prevComment: oldComment, comment: newComment});
                 }
             });
         }
@@ -103,7 +113,7 @@ exports.comment_like = async function(req, res, next) {
         return res.status(404).json({message: 'Comment not found.'});
     }
     if (targetComment.comment_likes.includes(req.payload.id)) {
-        let oldLikes = [...targetComment.comment_like];
+        let oldLikes = [...targetComment.comment_likes];
         let updatedLikes = oldLikes.filter((userId) => {
             userId != req.payload.id;
         });
@@ -111,7 +121,7 @@ exports.comment_like = async function(req, res, next) {
         const updatedComment = await targetComment.save();
         return res.status(201).json({message: 'Comment unliked.', comment: updatedComment});
     }
-    targetComment.comment_like.push(req.payload.id);
+    targetComment.comment_likes.push(req.payload.id);
     const updatedComment = await targetComment.save();
     return res.status(201).json({message: 'Comment liked.', comment: updatedComment});
 };
