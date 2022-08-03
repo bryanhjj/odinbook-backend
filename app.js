@@ -15,7 +15,6 @@ var app = express();
 // to update cors accordingly
 app.use(cors({
     origin: 'https://bryanhjj.github.io',
-    credentials: true,
 }));
 app.use(logger('dev'));
 app.use(express.json());
