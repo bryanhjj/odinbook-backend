@@ -1,7 +1,7 @@
 var multer = require("multer");
 var { v4: uuidv4 } = require("uuid");
 
-var DIR = "./public/images";
+var DIR = "../public/images";
 
 var storage = multer.diskStorage({
   destination: (req, file, cb) => {
