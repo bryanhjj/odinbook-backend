@@ -89,8 +89,12 @@ exports.post_create = [
                     if (err) {
                         return res.status(500).json({message: err});
                     }
-                    return res.status(201).json({message: 'Successfully posted.', post: newPost});
-                })
+                });
+                // need to populate post_author here else it'll just return the post_author id when creating a new post
+                // which in turn causes an error in <UseAvatar> (frontend) when the component tries to read
+                // post_author.first_name & post_author.last_name
+                const newPostWithAuthor = await newPost.populate('post_author');
+                return res.status(201).json({message: 'Successfully posted.', post: newPostWithAuthor});
             } else {
                 // user attached an image when creating post
                 // double check BASE_URI
@@ -99,8 +103,12 @@ exports.post_create = [
                     if (err) {
                         return res.status(500).json({message: err});
                     }
-                    return res.status(201).json({message: 'Successfully posted.', post: newPost});
                 });
+                // need to populate post_author here else it'll just return the post_author id when creating a new post
+                // which in turn causes an error in <UseAvatar> (frontend) when the component tries to read
+                // post_author.first_name & post_author.last_name
+                const newPostWithAuthor = await newPost.populate('post_author');
+                return res.status(201).json({message: 'Successfully posted.', post: newPostWithAuthor});
             }
         }
     }
